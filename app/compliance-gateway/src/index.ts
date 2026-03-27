@@ -252,6 +252,34 @@ app.post('/compliance/advisory', async (req, res) => {
     }
 });
 
+// ==================== AGENT RECEIPT STORE ====================
+const agentReceipts: Array<Record<string, unknown>> = [];
+
+app.post('/agent/receipt', (req, res) => {
+    const receipt = req.body;
+    if (!receipt || !receipt.agent_id || !receipt.signature) {
+        return res.status(400).json({ error: 'Invalid receipt — missing agent_id or signature' });
+    }
+    agentReceipts.unshift(receipt);
+    if (agentReceipts.length > 100) agentReceipts.pop();
+    return res.json({ stored: true, total: agentReceipts.length });
+});
+
+app.get('/agent/receipts', (_req, res) => {
+    res.json({ receipts: agentReceipts.slice(0, 20), total: agentReceipts.length });
+});
+
+app.get('/agent/status', (_req, res) => {
+    const latest = agentReceipts[0] || null;
+    res.json({
+        agent_id: 'AG-TREASURY-AGENT-v1',
+        receipts_stored: agentReceipts.length,
+        latest_action: latest?.action || null,
+        latest_decision: latest?.decision || null,
+        latest_timestamp: latest?.timestamp || null,
+    });
+});
+
 const PORT = 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Antigravity Compliance Gateway running on port ${PORT}`);

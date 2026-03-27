@@ -7,6 +7,7 @@
     "start:gateway": "cd app/compliance-gateway && npm start",
     "start:bridge": "cd app/sdp-bridge && npm start",
     "start:dashboard": "cd app/dashboard && npm run dev",
+    "start:agent": "cd llm && python agent.py",
     "demo": "node scripts/cross-border-demo.mjs",
     "install:all": "npm install && cd app/compliance-gateway && npm install && cd ../sdp-bridge && npm install && cd ../dashboard && npm install",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
