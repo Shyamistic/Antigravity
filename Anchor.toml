@@ -1,0 +1,33 @@
+[features]
+seeds = true
+skip-lint = false
+
+[programs.localnet]
+antigravity_core  = "EiCCdPf5QBvVbywubi6LdgPeC5RbL4Qef5KV4ScUj9hy"
+antigravity_yield = "AntiGrv2222222222222222222222222222222222222"
+
+[programs.devnet]
+antigravity_core  = "EiCCdPf5QBvVbywubi6LdgPeC5RbL4Qef5KV4ScUj9hy"
+antigravity_yield = "AntiGrv2222222222222222222222222222222222222"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet   = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 10000
+
+[test.validator]
+url = "https://api.devnet.solana.com"
+
+[[test.validator.clone]]
+address = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+
+[[test.validator.clone]]
+address = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe8bv"

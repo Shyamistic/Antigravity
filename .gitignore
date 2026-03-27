@@ -1,0 +1,43 @@
+# ==================== SECRETS ====================
+.env
+*.pem
+*.key
+*.cert
+
+# ==================== NODE ====================
+node_modules/
+dist/
+.npm/
+npm-debug.log*
+
+# ==================== PYTHON ====================
+antigravity-env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ==================== RUST / ANCHOR ====================
+target/
+**/*.rs.bk
+Cargo.lock
+
+# ==================== SOLANA ====================
+.anchor/
+test-ledger/
+
+# ==================== OS ====================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==================== EDITOR ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==================== MISC ====================
+*.log
+*.zip
