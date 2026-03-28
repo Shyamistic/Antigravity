@@ -30,10 +30,9 @@ Antigravity is a decentralized treasury management system for institutions. It b
 ## 3. Integration Mappings
 | Component | Status | Production Endpoint |
 | :--- | :--- | :--- |
-| **Institutional Dashboard** | Ready | `http://localhost:5173` |
-| **Compliance Gateway** | Functional | `http://localhost:3001/attest` |
-| **SDP Payment Bridge** | Functional | `http://localhost:3002/settle` |
-| **Core Program ID** | LIVE | `beHz9dkAWuS5h4ws38EtjBJnTafMFHwPaECQkF5EHAY` |
+| **Institutional Dashboard** | LIVE | `https://antigravity-jvq0sa4rp-shyamsharma31415-5947s-projects.vercel.app` |
+| **Compliance Gateway** | LIVE | `https://antigravity-zl5d.onrender.com` |
+| **Core Program ID** | LIVE | `Heh9pGUxRkkkEPkWv3xiBxcb3tqd7t4vDMf8vu9sxrxG` |
 | **Yield Program ID** | LIVE | `9qadvA7V3oNiuZobTRbiAfExXQdz4YYuLkVwTt8obosT` |
 
 ## 4. Scalability Note
