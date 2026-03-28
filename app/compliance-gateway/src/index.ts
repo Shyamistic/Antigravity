@@ -39,15 +39,26 @@ const SPONSORS = {
 };
 
 // ==================== SIX API (CERTS) ====================
-const SIX_CREDS_DIR = path.join(__dirname, '../../../details/six_api_creds/CH56655-api2026hack38');
-const SIX_CERT = fs.readFileSync(path.join(SIX_CREDS_DIR, 'signed-certificate.pem'));
-const SIX_KEY = fs.readFileSync(path.join(SIX_CREDS_DIR, 'private-key.pem'));
-const SIX_CA = fs.readFileSync(path.join(__dirname, '../../../details/six_api_creds/six_server_ca.pem'));
+function getSixCert(envVar: string, localPath: string): Buffer {
+    if (process.env[envVar]) {
+        return Buffer.from(process.env[envVar]!, 'base64');
+    }
+    const fullPath = path.join(__dirname, localPath);
+    if (fs.existsSync(fullPath)) {
+        return fs.readFileSync(fullPath);
+    }
+    console.warn(`[WARN] Certificate source missing: ${envVar} or ${localPath}`);
+    return Buffer.alloc(0);
+}
+
+const SIX_CERT = getSixCert('SIX_CERT_B64', '../../../details/six_api_creds/CH56655-api2026hack38/signed-certificate.pem');
+const SIX_KEY = getSixCert('SIX_KEY_B64', '../../../details/six_api_creds/CH56655-api2026hack38/private-key.pem');
+const SIX_CA = getSixCert('SIX_CA_B64', '../../../details/six_api_creds/six_server_ca.pem');
 
 const sixAgent = new https.Agent({
-    cert: SIX_CERT,
-    key: SIX_KEY,
-    ca: SIX_CA,
+    cert: SIX_CERT.length > 0 ? SIX_CERT : undefined,
+    key: SIX_KEY.length > 0 ? SIX_KEY : undefined,
+    ca: SIX_CA.length > 0 ? SIX_CA : undefined,
     rejectUnauthorized: false // Dev override for hackathon environment
 });
 
