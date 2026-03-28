@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { API_URL } from '../config';
 import {
   Shield, Brain, Terminal, Activity, AlertTriangle, CheckCircle,
   Cpu, X, ChevronRight, RefreshCw, Search, Zap, Eye
@@ -69,7 +70,7 @@ const ComplianceCenter = () => {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:3001/logs');
+      const res = await fetch(`${API_URL}/logs`);
       const data = await res.json();
       setLogs(data.logs ?? []);
     } catch {}
@@ -89,7 +90,7 @@ const ComplianceCenter = () => {
     setIsOrchestrating(true);
     setSwarmStatus('ALPHA: PARSING_LIQUIDITY_DEPTH...');
     try {
-      await fetch('http://localhost:3001/demo/sweep', { method: 'POST' });
+      await fetch(`${API_URL}/demo/sweep`, { method: 'POST' });
       setTimeout(() => setSwarmStatus('BETA: CROSS-REFERENCING_FATF_LISTS...'), 1200);
       setTimeout(() => setSwarmStatus('OMEGA: SETTLEMENT_FINALIZED_v5.1'), 2400);
       setTimeout(() => { setSwarmStatus(null); setIsOrchestrating(false); }, 5000);
@@ -98,7 +99,7 @@ const ComplianceCenter = () => {
 
   const triggerViolation = async () => {
     try {
-      await fetch('http://localhost:3001/demo/real-violation', { method: 'POST' });
+      await fetch(`${API_URL}/demo/real-violation`, { method: 'POST' });
       setViolationCount(c => c + 1);
       setHookHistory(h => [`[${new Date().toTimeString().slice(0, 8)}] BLOCKED: 0xDEADBEEF → PEEP_SANCTION`, ...h.slice(0, 9)]);
     } catch {}
@@ -106,7 +107,7 @@ const ComplianceCenter = () => {
 
   const runScan = async () => {
     try {
-      const res = await fetch('http://localhost:3001/compliance/scan');
+      const res = await fetch(`${API_URL}/compliance/scan`);
       setScanResult(await res.json());
       setModal('SCAN_RESULT');
     } catch {}

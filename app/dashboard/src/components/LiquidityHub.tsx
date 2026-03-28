@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_URL } from '../config';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { TrendingUp, Globe, Zap, Activity, RefreshCw, ChevronRight, X, AlertTriangle, Shield } from 'lucide-react';
 
@@ -56,8 +57,8 @@ const LiquidityHub = () => {
   const fetchAll = useCallback(async () => {
     try {
       const [pRes, cRes] = await Promise.allSettled([
-        fetch('http://localhost:3001/liquidity/positions'),
-        fetch('http://localhost:3001/charts/flows'),
+        fetch(`${API_URL}/liquidity/positions`),
+        fetch(`${API_URL}/charts/flows`),
       ]);
       if (pRes.status === 'fulfilled') setPositions(await pRes.value.json());
       if (cRes.status === 'fulfilled') setChartData(await cRes.value.json());
@@ -76,7 +77,7 @@ const LiquidityHub = () => {
     setIsSweeping(true);
     setSweepResult(null);
     try {
-      await fetch('http://localhost:3001/demo/sweep', { method: 'POST' });
+      await fetch(`${API_URL}/demo/sweep`, { method: 'POST' });
       setSweepResult(`SWEEP_COMPLETE: $1.2M reallocated via Solana-L3 · ${new Date().toTimeString().slice(0, 8)}`);
     } catch {}
     setTimeout(() => setIsSweeping(false), 2000);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_URL } from '../config';
 import {
   AreaChart, Area, LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid
 } from 'recharts';
@@ -105,12 +106,12 @@ const Overview = () => {
   const fetchAll = useCallback(async () => {
     try {
       const [mRes, bRes, cRes, p1, p2, p3] = await Promise.allSettled([
-        fetch('http://localhost:3001/metrics'),
-        fetch('http://localhost:3001/balance'),
-        fetch('http://localhost:3001/charts/flows'),
-        fetch('http://localhost:3001/fx-rate?pair=USD/CHF'),
-        fetch('http://localhost:3001/fx-rate?pair=EUR/CHF'),
-        fetch('http://localhost:3001/liquidity/positions'),
+        fetch(`${API_URL}/metrics`),
+        fetch(`${API_URL}/balance`),
+        fetch(`${API_URL}/charts/flows`),
+        fetch(`${API_URL}/fx-rate?pair=USD/CHF`),
+        fetch(`${API_URL}/fx-rate?pair=EUR/CHF`),
+        fetch(`${API_URL}/liquidity/positions`),
       ]);
       if (mRes.status === 'fulfilled') {
         const d = await mRes.value.json();
@@ -136,14 +137,14 @@ const Overview = () => {
 
   const handleStressTest = async () => {
     setIsStressTesting(true);
-    try { await fetch('http://localhost:3001/admin/stress-test', { method: 'POST' }); } catch {}
+    try { await fetch(`${API_URL}/admin/stress-test`, { method: 'POST' }); } catch {}
     setTimeout(() => setIsStressTesting(false), 3500);
   };
 
   const runComplianceScan = async () => {
     setScanRunning(true);
     try {
-      const r = await fetch('http://localhost:3001/compliance/scan');
+      const r = await fetch(`${API_URL}/compliance/scan`);
       setComplianceScan(await r.json());
       setModal('COMPLIANCE_SCAN');
     } catch {}

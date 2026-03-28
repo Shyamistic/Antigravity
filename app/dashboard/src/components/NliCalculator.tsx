@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_URL } from '../config';
 import { Landmark, ArrowRight, RefreshCw, TrendingDown, ChevronRight, X, Shield } from 'lucide-react';
 
 const Pill = ({ label, value, color = '#999' }: { label: string; value: string; color?: string }) => (
@@ -61,7 +62,7 @@ const NostroAnalytics = () => {
   const fetchFx = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/fx-rate?pair=USD/CHF');
+      const res = await fetch(`${API_URL}/fx-rate?pair=USD/CHF`);
       const data = await res.json();
       setFxData({ rate: data.rate, latency: data.latency, source: data.source });
     } catch {
@@ -84,7 +85,7 @@ const NostroAnalytics = () => {
   const executeLiberation = async () => {
     const ts = new Date().toTimeString().slice(0, 8);
     setExecHistory(h => [{ amount: `$${Number(amount).toLocaleString()}`, converted: `₣${converted}`, time: ts }, ...h.slice(0, 4)]);
-    try { await fetch('http://localhost:3001/demo/sweep', { method: 'POST' }); } catch {}
+    try { await fetch(`${API_URL}/demo/sweep`, { method: 'POST' }); } catch {}
   };
 
   return (

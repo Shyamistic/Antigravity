@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { API_URL } from '../config';
 import {
   Shield, Power, RotateCcw, Lock, AlertTriangle, Terminal, Key,
   Activity, Clock, ChevronRight, X, RefreshCw, Zap, BarChart2
@@ -53,9 +54,9 @@ const AdminPanel = () => {
   const fetchAll = useCallback(async () => {
     try {
       const [sRes, lRes, mRes] = await Promise.allSettled([
-        fetch('http://localhost:3001/status'),
-        fetch('http://localhost:3001/logs'),
-        fetch('http://localhost:3001/metrics'),
+        fetch(`${API_URL}/status`),
+        fetch(`${API_URL}/logs`),
+        fetch(`${API_URL}/metrics`),
       ]);
       if (sRes.status === 'fulfilled') { const d = await sRes.value.json(); setIsHalted(d.status === 'HALTED'); }
       if (lRes.status === 'fulfilled') { const d = await lRes.value.json(); setLogs(d.logs ?? []); }
@@ -76,7 +77,7 @@ const AdminPanel = () => {
   const toggleHalt = async () => {
     setActionStatus(isHalted ? 'RESUMING...' : 'HALTING...');
     try {
-      const res = await fetch('http://localhost:3001/admin/halt', { method: 'POST' });
+      const res = await fetch(`${API_URL}/admin/halt`, { method: 'POST' });
       const data = await res.json();
       setIsHalted(data.halted);
       setActionStatus(data.halted ? 'PROTOCOL HALTED' : 'PROTOCOL RESUMED');
@@ -87,7 +88,7 @@ const AdminPanel = () => {
   const resetLogs = async () => {
     setActionStatus('FLUSHING AUDIT LOGS...');
     try {
-      await fetch('http://localhost:3001/admin/reset-logs', { method: 'POST' });
+      await fetch(`${API_URL}/admin/reset-logs`, { method: 'POST' });
       setLogs([]);
       setActionStatus('LOGS FLUSHED');
     } catch { setActionStatus('ERROR'); }
@@ -98,7 +99,7 @@ const AdminPanel = () => {
     setIsRotating(true);
     setActionStatus('ROTATING ACCESS KEYS...');
     try {
-      const res = await fetch('http://localhost:3001/admin/rotate-keys', { method: 'POST' });
+      const res = await fetch(`${API_URL}/admin/rotate-keys`, { method: 'POST' });
       const data = await res.json();
       setActionStatus(`KEY_ROTATED: ${data.newKeyId}`);
     } catch { setActionStatus('ROTATION FAILED'); }
@@ -108,7 +109,7 @@ const AdminPanel = () => {
   const runStressTest = async () => {
     setActionStatus('EXECUTING STRESS SIMULATION...');
     try {
-      await fetch('http://localhost:3001/admin/stress-test', { method: 'POST' });
+      await fetch(`${API_URL}/admin/stress-test`, { method: 'POST' });
       setActionStatus('STRESS TEST COMPLETE');
     } catch { setActionStatus('ERROR'); }
     setTimeout(() => setActionStatus(null), 3000);

@@ -4,9 +4,12 @@
   "description": "Antigravity Institutional Liquidity Orchestrator",
   "scripts": {
     "install:all": "npm install && cd app/compliance-gateway && npm install && cd ../dashboard && npm install",
+    "build": "npm run build:gateway",
+    "build:gateway": "cd app/compliance-gateway && npm install && npm run build",
     "start": "npx concurrently \"npm run start:gateway\" \"npm run start:dashboard\"",
     "start:gateway": "cd app/compliance-gateway && npm start",
-    "start:dashboard": "cd app/dashboard && npm run dev"
+    "start:dashboard": "cd app/dashboard && npm run dev",
+    "start:prod": "cd app/compliance-gateway && npm start"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
