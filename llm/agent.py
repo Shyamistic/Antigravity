@@ -50,8 +50,8 @@ AGENT_CONFIG = {
     "compliance_gateway": os.getenv("COMPLIANCE_GATEWAY_URL", "http://localhost:3001"),
     "sdp_bridge": os.getenv("SDP_BRIDGE_URL", "http://localhost:3002"),
 
-    # SIX API config
-    "six_api_base": "https://web.apiportal.six-group.com/portal/bfi",
+    # SIX API config (Official Endpoint)
+    "six_api_base": "https://api.six-group.com/web/v1",
     "six_api_key": os.getenv("SIX_API_KEY", ""),  # from hackathon credentials
 
     # Agent signing key (HMAC-SHA256 for receipt signing)
@@ -112,58 +112,24 @@ def emit_receipt(action: str, decision: str, reason: str, details: dict) -> dict
 
 # ==================== SIX API FX RATES ====================
 _fx_cache: dict = {}
-_fx_cache_ttl = 10  # seconds
-
-# Fallback institutional rates (used when SIX API key not available)
-_FALLBACK_RATES = {
-    "USD/CHF": 0.8924, "USD/EUR": 0.9145, "USD/GBP": 0.7842,
-    "CHF/USD": 1.1206, "EUR/USD": 1.0935, "GBP/USD": 1.2752,
-}
-
-# SIX BFI instrument ISINs for FX pairs (from Cross Currency Identifiers file)
-_SIX_FX_ISINS = {
-    "USD/CHF": "CH0000000012",  # USD/CHF spot
-    "USD/EUR": "CH0000000013",  # USD/EUR spot
-    "USD/GBP": "CH0000000014",  # USD/GBP spot
-}
-
+_fx_cache_ttl = 30  # seconds
 
 async def fetch_fx_rate_six(session: aiohttp.ClientSession, pair: str) -> float:
-    """Fetch live FX rate from SIX BFI intradaySnapshot API."""
+    """Fetch live FX rate from SIX BFI via the unified six_fx module."""
     cached = _fx_cache.get(pair)
     if cached and time.time() - cached["ts"] < _fx_cache_ttl:
         return cached["rate"]
 
-    api_key = AGENT_CONFIG["six_api_key"]
-    if not api_key:
-        # No SIX API key — use fallback rates
-        rate = _FALLBACK_RATES.get(pair, 1.0)
-        _fx_cache[pair] = {"rate": rate, "ts": time.time(), "source": "fallback"}
-        return rate
-
-    isin = _SIX_FX_ISINS.get(pair)
-    if not isin:
-        return _FALLBACK_RATES.get(pair, 1.0)
-
-    url = f"{AGENT_CONFIG['six_api_base']}/catalog/intradaySnapshot/overview"
-    headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
-    params = {"isin": isin}
-
     try:
-        async with session.get(url, headers=headers, params=params, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                # SIX API response: data.data[0].lastPrice
-                rate = float(data.get("data", [{}])[0].get("lastPrice", _FALLBACK_RATES.get(pair, 1.0)))
-                _fx_cache[pair] = {"rate": rate, "ts": time.time(), "source": "SIX-BFI"}
-                log.info(f"[SIX API] {pair} = {rate} (live)")
-                return rate
+        from six_fx import fetch_live_fx_rate
+        result = fetch_live_fx_rate(pair)
+        rate = result.get("rate", 1.0)
+        _fx_cache[pair] = {"rate": rate, "ts": time.time(), "source": result.get("source", "SIX-BFI-MODULE")}
+        log.info(f"[SIX API] {pair} = {rate} ({result.get('source')})")
+        return rate
     except Exception as e:
-        log.warning(f"[SIX API] Failed for {pair}: {e} — using fallback")
-
-    rate = _FALLBACK_RATES.get(pair, 1.0)
-    _fx_cache[pair] = {"rate": rate, "ts": time.time(), "source": "fallback"}
-    return rate
+        log.warning(f"[SIX API] Module call failed for {pair}: {e}")
+        return 1.0
 
 
 # ==================== COMPLIANCE GATE CHECK ====================

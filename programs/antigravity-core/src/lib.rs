@@ -1,13 +1,305 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
-
-mod errors;
-mod state;
-
-use errors::*;
-use state::*;
+use spl_tlv_account_resolution::{
+    state::{ExtraAccountMetaList, ExtraAccountMeta},
+    seeds::Seed,
+};
+use spl_transfer_hook_interface::instruction::TransferHookInstruction;
 
 declare_id!("EiCCdPf5QBvVbywubi6LdgPeC5RbL4Qef5KV4ScUj9hy");
+
+// ==================== ERRORS ====================
+#[error_code]
+pub enum AntigravityError {
+    #[msg("Travel Rule violation: Transfer exceeds $1,000 and lacks Encrypted Identity Memo.")]
+    TravelRuleViolation,
+    #[msg("KYC Attestation not found or invalid for this account.")]
+    KycNotVerified,
+    #[msg("Compliance attestation has expired (exceeds 400ms/1-slot window).")]
+    AttestationExpired,
+    #[msg("Reentrancy detected in Transfer Hook.")]
+    Reentrancy,
+    #[msg("SIX BFI price feed is stale or unavailable.")]
+    PriceFeedStale,
+    #[msg("Unauthorized: Only the Permanent Delegate or Treasury Authority can perform this action.")]
+    Unauthorized,
+    #[msg("KYC attestation has expired and requires renewal.")]
+    KycExpired,
+    #[msg("KYC attestation is suspended.")]
+    KycSuspended,
+    #[msg("KYC tier insufficient for this operation.")]
+    InsufficientKycTier,
+    #[msg("Risk rating prohibits this transaction.")]
+    RiskRatingProhibited,
+}
+
+// ==================== STATE ====================
+#[account]
+pub struct MintConfig {
+    pub mint: Pubkey,
+    pub authority: Pubkey,
+    pub oracle: Pubkey,
+    pub price_feed: Option<Pubkey>,
+    pub bump: u8,
+}
+
+#[account]
+pub struct IdentityRegistry {
+    pub owner: Pubkey,
+    pub entity_id: [u8; 32],
+    pub kyc_status: bool,
+    pub jurisdiction: [u8; 16],
+    pub bump: u8,
+}
+
+#[account]
+pub struct KycAttestation {
+    pub owner: Pubkey,
+    pub verified_at: i64,
+    pub expires_at: i64,
+    pub kyc_tier: KycTier,
+    pub jurisdiction: [u8; 16],
+    pub entity_id: [u8; 32],
+    pub issuing_authority: Pubkey,
+    pub verification_method: VerificationMethod,
+    pub risk_rating: RiskRating,
+    pub last_reviewed: i64,
+    pub review_frequency_days: u16,
+    pub is_active: bool,
+    pub renewal_required: bool,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum KycTier {
+    Basic, Standard, Enhanced, Premium,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationMethod {
+    DocumentScan, Biometric, ThirdPartyAttestation, ManualReview, AiAutomated,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum RiskRating {
+    Low, Medium, High, Extreme, Prohibited,
+}
+
+#[account]
+pub struct TransactionMonitor {
+    pub owner: Pubkey,
+    pub total_volume_24h: u64,
+    pub transaction_count_24h: u32,
+    pub last_transaction_timestamp: i64,
+    pub velocity_score: u8,
+    pub geographic_spread: u8,
+    pub counterparty_count_24h: u32,
+    pub average_transaction_size: u64,
+    pub largest_transaction_24h: u64,
+    pub risk_flags: u32, // Bitfield using RiskFlag
+    pub last_updated: i64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)] // Explicit representation for bitmasking
+pub enum RiskFlag {
+    HighVelocity      = 1 << 0,
+    Structuring       = 1 << 1,
+    GeographicAnomaly = 1 << 2,
+    NewCounterparty   = 1 << 3,
+    LargeTransaction  = 1 << 4,
+    RoundAmount       = 1 << 5,
+}
+
+#[account]
+pub struct ComplianceAttestation {
+    pub slot: u64,
+    pub hash: [u8; 32],
+}
+
+#[account]
+pub struct CounterpartyRelationship {
+    pub owner: Pubkey,
+    pub counterparty: Pubkey,
+    pub allowed: bool,
+}
+
+#[account]
+pub struct ReentrancyLock {
+    pub is_locked: bool,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum Decision { Allow, Reject }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum RiskScore { Low, Medium, High }
+
+
+
+#[event]
+pub struct TransferEvaluated {
+    pub sender: Pubkey,
+    pub receiver: Pubkey,
+    pub amount: u64,
+    pub attestation_slot: u64,
+    pub risk_score: u8,
+    pub decision: Decision,
+    pub travel_rule_hash: [u8; 32],
+}
+
+// ==================== VAULT & GOVERNANCE ====================
+#[account]
+pub struct Vault {
+    pub owner: Pubkey,
+    pub vault_id: [u8; 32],
+    pub vault_type: VaultType,
+    pub status: VaultStatus,
+    pub total_balance: u64,
+    pub available_balance: u64,
+    pub locked_balance: u64,
+    pub currency: [u8; 8],
+    pub created_at: i64,
+    pub last_activity: i64,
+    pub risk_score: u8,
+    pub compliance_tier: ComplianceTier,
+    pub authorized_signers: Vec<Pubkey>,
+    pub required_signatures: u8,
+    pub auto_sweep_enabled: bool,
+    pub auto_sweep_threshold: u64,
+    pub yield_strategy: YieldStrategy,
+    pub metadata: VaultMetadata,
+}
+
+#[account]
+pub struct VaultTransaction {
+    pub vault_id: [u8; 32],
+    pub transaction_id: [u8; 32],
+    pub transaction_type: TransactionType,
+    pub amount: u64,
+    pub currency: [u8; 8],
+    pub counterparty: Pubkey,
+    pub timestamp: i64,
+    pub status: TransactionStatus,
+    pub compliance_check: ComplianceResult,
+    pub fx_rate: Option<u64>,
+    pub notes: [u8; 256],
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum VaultType { HotWallet, ColdStorage, Settlement, Treasury, Nostro, Yield }
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum VaultStatus { Active, Frozen, Suspended, Closed, PendingApproval }
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum ComplianceTier { Basic, Enhanced, Premium, Institutional }
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum YieldStrategy { None, Conservative, Balanced, Aggressive }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct VaultMetadata {
+    pub name: [u8; 64],
+    pub description: [u8; 256],
+    pub tags: Vec<[u8; 32]>,
+    pub custom_fields: Vec<VaultCustomField>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct VaultCustomField {
+    pub key: [u8; 32],
+    pub value: [u8; 128],
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct RiskAssessment {
+    pub risk_level: RiskRating,
+    pub assessment_reason: [u8; 256],
+    pub assessed_by: Pubkey,
+    pub assessed_at: i64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum TransactionType { Deposit, Withdrawal, Transfer, Settlement, YieldClaim, FeePayment, ComplianceFee }
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum TransactionStatus { Pending, Processing, Completed, Failed, Rejected, Reversed }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub struct ComplianceResult {
+    pub passed: bool,
+    pub risk_score: u8,
+    pub flags: u32,
+    pub attestation_required: bool,
+    pub travel_rule_required: bool,
+}
+
+#[account]
+pub struct MultisigWallet {
+    pub multisig_id: [u8; 32],
+    pub owners: Vec<Pubkey>,
+    pub threshold: u8,
+    pub nonce: u64,
+    pub owner_set_seqno: u32,
+    pub wallet_type: MultisigType,
+    pub permissions: MultisigPermissions,
+    pub metadata: MultisigMetadata,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum MultisigType { Institutional, Corporate, DAO, Personal }
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum MultisigPermissions { Full, Limited, Compliance, ReadOnly }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct MultisigMetadata {
+    pub name: [u8; 64],
+    pub description: [u8; 256],
+    pub created_at: i64,
+    pub daily_limit: u64,
+    pub monthly_limit: u64,
+}
+
+#[account]
+pub struct MultisigTransaction {
+    pub multisig: Pubkey,
+    pub transaction_id: u64,
+    pub proposer: Pubkey,
+    pub instructions: Vec<MultisigInstruction>,
+    pub signers: Vec<bool>,
+    pub executed: bool,
+    pub execution_time: Option<i64>,
+    pub expiry_time: i64,
+    pub transaction_type: MultisigTransactionType,
+    pub approval_count: u8,
+    pub rejection_count: u8,
+    pub metadata: TransactionMetadata,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct MultisigInstruction {
+    pub program_id: Pubkey,
+    pub accounts: Vec<MultisigAccountMeta>,
+    pub data: Vec<u8>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct MultisigAccountMeta {
+    pub pubkey: Pubkey,
+    pub is_signer: bool,
+    pub is_writable: bool,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct TransactionMetadata {
+    pub title: [u8; 128],
+    pub description: [u8; 256],
+    pub amount: Option<u64>,
+    pub currency: Option<[u8; 8]>,
+    pub counterparty: Option<Pubkey>,
+    pub risk_assessment: Option<RiskAssessment>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum MultisigTransactionType {
+    Transfer, VaultOperation, ComplianceUpdate, GovernanceChange, EmergencyAction, RoutineOperation,
+}
 
 #[program]
 pub mod antigravity_core {
@@ -28,6 +320,8 @@ pub mod antigravity_core {
         entity_id: String,
         jurisdiction: String,
     ) -> Result<()> {
+        // ENFORCEMENT: Only a designated KYC authority can register users
+        // (For MVP, we use the payer's presence as the signer, but check if authority is provided)
         let id = &mut ctx.accounts.identity_registry;
         id.owner = ctx.accounts.owner.key();
         id.entity_id = str_to_fixed32(entity_id)?;
@@ -64,13 +358,44 @@ pub mod antigravity_core {
         travel_rule_hash: [u8; 32],
         risk_score: u8,
     ) -> Result<()> {
+        msg!("ANTIGRAVITY: Compliance Execution Triggered for transfer of {} units", amount);
         let lock = &mut ctx.accounts.lock;
         if lock.is_locked {
             return err!(AntigravityError::Reentrancy);
         }
         lock.is_locked = true;
 
-        if amount >= 3_000_000_000 {
+        // 1. RISK-BASED ENFORCEMENT
+        let risk = if risk_score >= 80 {
+            RiskScore::High
+        } else if risk_score >= 50 {
+            RiskScore::Medium
+        } else {
+            RiskScore::Low
+        };
+
+        if risk == RiskScore::High {
+            lock.is_locked = false;
+            emit!(TransferEvaluated {
+                sender: ctx.accounts.owner.key(),
+                receiver: ctx.accounts.receiver_owner.key(),
+                amount,
+                attestation_slot: ctx.accounts.compliance_attestation.slot,
+                risk_score,
+                decision: Decision::Reject,
+                travel_rule_hash,
+            });
+            return err!(AntigravityError::RiskRatingProhibited);
+        }
+
+        // 2. TRAVEL RULE ENFORCEMENT ($3,000 threshold or missing data)
+        if amount >= 3_000_000_000 && travel_rule_hash == [0u8; 32] {
+            lock.is_locked = false;
+            return err!(AntigravityError::TravelRuleViolation);
+        }
+
+        // 3. KYC ENFORCEMENT ($1,000 threshold)
+        if amount >= 1_000_000_000 {
             // Check basic KYC status
             if !ctx.accounts.source_kyc.kyc_status || !ctx.accounts.receiver_kyc.kyc_status {
                 lock.is_locked = false;
@@ -102,7 +427,7 @@ pub mod antigravity_core {
             }
 
             if !(ctx.accounts.counterparty_relationship.allowed
-                && ctx.accounts.counterparty_relationship.owner == ctx.accounts.source_owner.key()
+                && ctx.accounts.counterparty_relationship.owner == ctx.accounts.owner.key()
                 && ctx.accounts.counterparty_relationship.counterparty == ctx.accounts.receiver_owner.key())
             {
                 lock.is_locked = false;
@@ -110,28 +435,7 @@ pub mod antigravity_core {
             }
         }
 
-        let risk = if risk_score >= 80 {
-            RiskScore::High
-        } else if risk_score >= 50 {
-            RiskScore::Medium
-        } else {
-            RiskScore::Low
-        };
-
-        if risk == RiskScore::High {
-            lock.is_locked = false;
-            emit!(TransferEvaluated {
-                sender: ctx.accounts.source_owner.key(),
-                receiver: ctx.accounts.receiver_owner.key(),
-                amount,
-                attestation_slot: ctx.accounts.compliance_attestation.slot,
-                risk_score,
-                decision: Decision::Reject,
-                travel_rule_hash,
-            });
-            return err!(AntigravityError::TravelRuleViolation);
-        }
-
+        // 4. ATTESTATION FRESHNESS Check
         let now_slot = Clock::get()?.slot;
         if ctx.accounts.compliance_attestation.slot < now_slot.saturating_sub(1) {
             lock.is_locked = false;
@@ -147,8 +451,9 @@ pub mod antigravity_core {
             return err!(AntigravityError::AttestationExpired);
         }
 
+        // 5. AUDIT TRAIL LOGGING
         emit!(TransferEvaluated {
-            sender: ctx.accounts.source_owner.key(),
+            sender: ctx.accounts.owner.key(),
             receiver: ctx.accounts.receiver_owner.key(),
             amount,
             attestation_slot: ctx.accounts.compliance_attestation.slot,
@@ -158,11 +463,6 @@ pub mod antigravity_core {
         });
 
         // Update transaction monitoring for KYT
-        let counterparty_jurisdiction = "CH"; // Simplified - would be derived from receiver KYC
-        let is_new_counterparty = !ctx.accounts.counterparty_relationship.allowed; // Simplified check
-
-        // Note: In a real implementation, this would be called via CPI or separate instruction
-        // For now, we'll inline the monitoring logic
         let monitor = &mut ctx.accounts.transaction_monitor;
         let clock = Clock::get()?;
 
@@ -184,10 +484,6 @@ pub mod antigravity_core {
 
         if amount > monitor.largest_transaction_24h {
             monitor.largest_transaction_24h = amount;
-        }
-
-        if is_new_counterparty {
-            monitor.counterparty_count_24h = monitor.counterparty_count_24h.saturating_add(1);
         }
 
         // Calculate velocity score
@@ -295,96 +591,68 @@ pub mod antigravity_core {
         Ok(())
     }
 
-    // ==================== NEW: KYT MONITORING INSTRUCTIONS ====================
 
-    pub fn update_transaction_monitor(
-        ctx: Context<UpdateTransactionMonitor>,
-        amount: u64,
-        counterparty_jurisdiction: String,
-        is_new_counterparty: bool,
+    // ==================== NEW: VAULT LIFECYCLE MANAGEMENT ====================
+
+    // ==================== NEW: VAULT LIFECYCLE MANAGEMENT ====================
+
+    pub fn initialize_extra_account_meta_list(
+        ctx: Context<InitializeExtraAccountMetaList>,
     ) -> Result<()> {
-        let monitor = &mut ctx.accounts.transaction_monitor;
-        let clock = Clock::get()?;
+        let account_metas = vec![
+            // 5: source_kyc [b"kyc", source_owner(3)]
+            ExtraAccountMeta::new_with_seeds(
+                &[Seed::Literal { bytes: b"kyc".to_vec() }, Seed::AccountKey { index: 3 }],
+                false, true,
+            )?,
+            // 6: receiver_kyc [b"kyc", receiver_owner(13)]
+            ExtraAccountMeta::new_with_seeds(
+                &[Seed::Literal { bytes: b"kyc".to_vec() }, Seed::AccountKey { index: 13 }],
+                false, true,
+            )?,
+            // 7: source_kyc_attestation [b"kyc_attestation", source_owner(3)]
+            ExtraAccountMeta::new_with_seeds(
+                &[Seed::Literal { bytes: b"kyc_attestation".to_vec() }, Seed::AccountKey { index: 3 }],
+                false, true,
+            )?,
+            // 8: receiver_kyc_attestation [b"kyc_attestation", receiver_owner(13)]
+            ExtraAccountMeta::new_with_seeds(
+                &[Seed::Literal { bytes: b"kyc_attestation".to_vec() }, Seed::AccountKey { index: 13 }],
+                false, true,
+            )?,
+            // 9: transaction_monitor [b"monitor", source_owner(3)]
+            ExtraAccountMeta::new_with_seeds(
+                &[Seed::Literal { bytes: b"monitor".to_vec() }, Seed::AccountKey { index: 3 }],
+                false, true,
+            )?,
+            // 10: counterparty_relationship [b"counterparty", source_owner(3), receiver_owner(13)]
+            ExtraAccountMeta::new_with_seeds(
+                &[
+                    Seed::Literal { bytes: b"counterparty".to_vec() },
+                    Seed::AccountKey { index: 3 },
+                    Seed::AccountKey { index: 13 },
+                ],
+                false, true,
+            )?,
+            // 11: compliance_attestation [b"attestation", source_owner(3)]
+            ExtraAccountMeta::new_with_seeds(
+                &[Seed::Literal { bytes: b"attestation".to_vec() }, Seed::AccountKey { index: 3 }],
+                false, true,
+            )?,
+            // 12: lock [b"lock", mint(1)]
+            ExtraAccountMeta::new_with_seeds(
+                &[Seed::Literal { bytes: b"lock".to_vec() }, Seed::AccountKey { index: 1 }],
+                false, true,
+            )?,
+        ];
 
-        // Reset counters if 24h has passed
-        let hours_since_update = (clock.unix_timestamp - monitor.last_updated) / 3600;
-        if hours_since_update >= 24 {
-            monitor.total_volume_24h = 0;
-            monitor.transaction_count_24h = 0;
-            monitor.geographic_spread = 0;
-            monitor.counterparty_count_24h = 0;
-            monitor.largest_transaction_24h = 0;
-        }
-
-        // Update transaction metrics
-        monitor.total_volume_24h = monitor.total_volume_24h.saturating_add(amount);
-        monitor.transaction_count_24h = monitor.transaction_count_24h.saturating_add(1);
-        monitor.last_transaction_timestamp = clock.unix_timestamp;
-        monitor.last_updated = clock.unix_timestamp;
-
-        if amount > monitor.largest_transaction_24h {
-            monitor.largest_transaction_24h = amount;
-        }
-
-        if is_new_counterparty {
-            monitor.counterparty_count_24h = monitor.counterparty_count_24h.saturating_add(1);
-        }
-
-        // Update geographic spread (simplified - in real implementation would track unique jurisdictions)
-        if monitor.geographic_spread < 255 {
-            monitor.geographic_spread = monitor.geographic_spread.saturating_add(1);
-        }
-
-        // Calculate average transaction size
-        if monitor.transaction_count_24h > 0 {
-            monitor.average_transaction_size = monitor.total_volume_24h / monitor.transaction_count_24h as u64;
-        }
-
-        // Calculate velocity score (0-100)
-        let volume_score = if monitor.total_volume_24h > 100_000_000_000 { 100 } // > 100k USD
-                          else if monitor.total_volume_24h > 10_000_000_000 { 75 } // > 10k USD
-                          else if monitor.total_volume_24h > 1_000_000_000 { 50 } // > 1k USD
-                          else { 0 };
-
-        let frequency_score = if monitor.transaction_count_24h > 50 { 100 }
-                             else if monitor.transaction_count_24h > 20 { 75 }
-                             else if monitor.transaction_count_24h > 10 { 50 }
-                             else if monitor.transaction_count_24h > 5 { 25 }
-                             else { 0 };
-
-        let geographic_score = if monitor.geographic_spread > 10 { 100 }
-                              else if monitor.geographic_spread > 5 { 50 }
-                              else { 0 };
-
-        monitor.velocity_score = ((volume_score + frequency_score + geographic_score) / 3) as u8;
-
-        // Set risk flags
-        let mut risk_flags = 0u32;
-        if monitor.velocity_score > 75 {
-            risk_flags |= RiskFlag::HighVelocity as u32;
-        }
-        if monitor.transaction_count_24h > 10 && monitor.average_transaction_size < 1_000_000_000 {
-            risk_flags |= RiskFlag::Structuring as u32;
-        }
-        if monitor.geographic_spread > 5 {
-            risk_flags |= RiskFlag::GeographicAnomaly as u32;
-        }
-        if is_new_counterparty {
-            risk_flags |= RiskFlag::NewCounterparty as u32;
-        }
-        if amount > 10_000_000_000 {
-            risk_flags |= RiskFlag::LargeTransaction as u32;
-        }
-        if amount % 1_000_000_000 == 0 { // Round amounts
-            risk_flags |= RiskFlag::RoundAmount as u32;
-        }
-
-        monitor.risk_flags = risk_flags;
+        // Zero copy initialization of the PDA
+        let account = &ctx.accounts.extra_account_meta_list;
+        let mut data = account.try_borrow_mut_data()?;
+        ExtraAccountMetaList::init::<TransferHookInstruction>(&mut data, &account_metas)?;
 
         Ok(())
     }
-
-    // ==================== NEW: VAULT LIFECYCLE MANAGEMENT ====================
 
     pub fn create_vault(
         ctx: Context<CreateVault>,
@@ -681,116 +949,155 @@ pub mod antigravity_core {
         Ok(())
     }
 
-    // ==================== NEW: VAULT ACCOUNT STRUCTS ====================
-
-    #[derive(Accounts)]
-    pub struct CreateVault<'info> {
-        #[account(init, payer = payer, space = 500, seeds = [b"vault", owner.key().as_ref(), vault_id.as_bytes()], bump)]
-        pub vault: Account<'info, Vault>,
-        pub owner: Signer<'info>,
-        /// CHECK: vault_id used in seed
-        pub vault_id: UncheckedAccount<'info>,
-        #[account(mut)]
-        pub payer: Signer<'info>,
-        pub system_program: Program<'info, System>,
+    pub fn update_transaction_monitor(
+        ctx: Context<UpdateMonitor>,
+        amount: u64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let mon = &mut ctx.accounts.monitor;
+        mon.total_volume_24h += amount;
+        mon.transaction_count_24h += 1;
+        mon.last_transaction_timestamp = timestamp;
+        
+        // Example bitmask update using RiskFlag
+        if amount > 10_000_000_000 {
+            mon.risk_flags |= RiskFlag::LargeTransaction as u32;
+        }
+        
+        Ok(())
     }
+} // End of antigravity_core module
 
-    #[derive(Accounts)]
-    pub struct ApproveVault<'info> {
-        #[account(mut, seeds = [b"vault", vault.owner.as_ref(), vault.vault_id.as_ref()], bump)]
-        pub vault: Account<'info, Vault>,
-        pub authority: Signer<'info>, // Compliance authority
-    }
+// ==================== ACCOUNT STRUCTS ====================
 
-    #[derive(Accounts)]
-    pub struct VaultDeposit<'info> {
-        #[account(mut, seeds = [b"vault", vault.owner.as_ref(), vault.vault_id.as_ref()], bump)]
-        pub vault: Account<'info, Vault>,
-        #[account(init, payer = payer, space = 300, seeds = [b"vault_tx", vault.vault_id.as_ref(), transaction_id.as_bytes()], bump)]
-        pub transaction: Account<'info, VaultTransaction>,
-        pub depositor: Signer<'info>,
-        /// CHECK: transaction_id used in seed
-        pub transaction_id: UncheckedAccount<'info>,
-        #[account(mut)]
-        pub payer: Signer<'info>,
-        pub system_program: Program<'info, System>,
-    }
+#[derive(Accounts)]
+#[instruction(vault_id_bytes: [u8; 32])]
+pub struct CreateVault<'info> {
+    #[account(init, payer = payer, space = 1200, seeds = [b"vault", owner.key().as_ref(), vault_id_bytes.as_ref()], bump)]
+    pub vault: Account<'info, Vault>,
+    pub owner: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
-    #[derive(Accounts)]
-    pub struct VaultTransfer<'info> {
-        #[account(mut, seeds = [b"vault", source_vault.owner.as_ref(), source_vault.vault_id.as_ref()], bump)]
-        pub source_vault: Account<'info, Vault>,
-        #[account(mut, seeds = [b"vault", destination_vault.owner.as_ref(), destination_vault.vault_id.as_ref()], bump)]
-        pub destination_vault: Account<'info, Vault>,
-        #[account(init, payer = payer, space = 300, seeds = [b"vault_tx", source_vault.vault_id.as_ref(), transaction_id.as_bytes()], bump)]
-        pub transaction: Account<'info, VaultTransaction>,
-        pub owner: Signer<'info>,
-        /// CHECK: transaction_id used in seed
-        pub transaction_id: UncheckedAccount<'info>,
-        #[account(mut)]
-        pub payer: Signer<'info>,
-        pub system_program: Program<'info, System>,
-    }
+#[derive(Accounts)]
+pub struct ApproveVault<'info> {
+    #[account(mut, seeds = [b"vault", vault.owner.as_ref(), vault.vault_id.as_ref()], bump)]
+    pub vault: Account<'info, Vault>,
+    pub authority: Signer<'info>, // Compliance authority
+}
 
-    #[derive(Accounts)]
-    pub struct FreezeVault<'info> {
-        #[account(mut, seeds = [b"vault", vault.owner.as_ref(), vault.vault_id.as_ref()], bump)]
-        pub vault: Account<'info, Vault>,
-        pub authority: Signer<'info>, // Compliance authority
-    }
+#[derive(Accounts)]
+#[instruction(transaction_id: String)]
+pub struct VaultDeposit<'info> {
+    #[account(mut, seeds = [b"vault", vault.owner.as_ref(), vault.vault_id.as_ref()], bump)]
+    pub vault: Account<'info, Vault>,
+    #[account(init, payer = payer, space = 500, seeds = [b"vault_tx", vault.vault_id.as_ref(), transaction_id.as_bytes()], bump)]
+    pub transaction: Account<'info, VaultTransaction>,
+    pub depositor: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
-    // ==================== NEW: MULTISIG ACCOUNT STRUCTS ====================
+#[derive(Accounts)]
+#[instruction(transaction_id: String)]
+pub struct VaultWithdraw<'info> {
+    #[account(mut, seeds = [b"vault", vault.owner.as_ref(), vault.vault_id.as_ref()], bump)]
+    pub vault: Account<'info, Vault>,
+    #[account(init, payer = payer, space = 500, seeds = [b"vault_tx", vault.vault_id.as_ref(), transaction_id.as_bytes()], bump)]
+    pub transaction: Account<'info, VaultTransaction>,
+    pub withdrawer: Signer<'info>,
+    #[account(mut, seeds = [b"kyc", withdrawer.key().as_ref()], bump)]
+    pub source_kyc: Account<'info, IdentityRegistry>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
-    #[derive(Accounts)]
-    pub struct CreateMultisig<'info> {
-        #[account(init, payer = payer, space = 500, seeds = [b"multisig", multisig_id.as_bytes()], bump)]
-        pub multisig: Account<'info, MultisigWallet>,
-        pub creator: Signer<'info>,
-        /// CHECK: multisig_id used in seed
-        pub multisig_id: UncheckedAccount<'info>,
-        #[account(mut)]
-        pub payer: Signer<'info>,
-        pub system_program: Program<'info, System>,
-    }
+#[derive(Accounts)]
+#[instruction(transaction_id: String)]
+pub struct VaultTransfer<'info> {
+    #[account(mut, seeds = [b"vault", source_vault.owner.as_ref(), source_vault.vault_id.as_ref()], bump)]
+    pub source_vault: Account<'info, Vault>,
+    #[account(mut, seeds = [b"vault", destination_vault.owner.as_ref(), destination_vault.vault_id.as_ref()], bump)]
+    pub destination_vault: Account<'info, Vault>,
+    #[account(init, payer = payer, space = 500, seeds = [b"vault_tx", source_vault.vault_id.as_ref(), transaction_id.as_bytes()], bump)]
+    pub transaction: Account<'info, VaultTransaction>,
+    pub owner: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
-    #[derive(Accounts)]
-    pub struct ProposeTransaction<'info> {
-        #[account(mut, seeds = [b"multisig", multisig.multisig_id.as_ref()], bump)]
-        pub multisig: Account<'info, MultisigWallet>,
-        #[account(init, payer = payer, space = 1000, seeds = [b"multisig_tx", multisig.key().as_ref(), &multisig.nonce.to_le_bytes()], bump)]
-        pub transaction: Account<'info, MultisigTransaction>,
-        pub proposer: Signer<'info>,
-        #[account(mut)]
-        pub payer: Signer<'info>,
-        pub system_program: Program<'info, System>,
-    }
+#[derive(Accounts)]
+pub struct FreezeVault<'info> {
+    #[account(mut, seeds = [b"vault", vault.owner.as_ref(), vault.vault_id.as_ref()], bump)]
+    pub vault: Account<'info, Vault>,
+    pub authority: Signer<'info>, // Compliance authority
+}
 
-    #[derive(Accounts)]
-    pub struct ApproveTransaction<'info> {
-        #[account(mut, seeds = [b"multisig", multisig.multisig_id.as_ref()], bump)]
-        pub multisig: Account<'info, MultisigWallet>,
-        #[account(mut, seeds = [b"multisig_tx", multisig.key().as_ref(), &transaction.transaction_id.to_le_bytes()], bump)]
-        pub transaction: Account<'info, MultisigTransaction>,
-        pub approver: Signer<'info>,
-    }
+#[derive(Accounts)]
+#[instruction(multisig_id_bytes: [u8; 32])]
+pub struct CreateMultisig<'info> {
+    #[account(init, payer = payer, space = 800, seeds = [b"multisig", multisig_id_bytes.as_ref()], bump)]
+    pub multisig: Account<'info, MultisigWallet>,
+    pub creator: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
-    #[derive(Accounts)]
-    pub struct ExecuteTransaction<'info> {
-        #[account(mut, seeds = [b"multisig", multisig.multisig_id.as_ref()], bump)]
-        pub multisig: Account<'info, MultisigWallet>,
-        #[account(mut, seeds = [b"multisig_tx", multisig.key().as_ref(), &transaction.transaction_id.to_le_bytes()], bump)]
-        pub transaction: Account<'info, MultisigTransaction>,
-        pub executor: Signer<'info>,
-    }
+#[derive(Accounts)]
+pub struct ProposeTransaction<'info> {
+    #[account(mut, seeds = [b"multisig", multisig.multisig_id.as_ref()], bump)]
+    pub multisig: Account<'info, MultisigWallet>,
+    #[account(init, payer = payer, space = 2000, seeds = [b"multisig_tx", multisig.key().as_ref(), &multisig.nonce.to_le_bytes()], bump)]
+    pub transaction: Account<'info, MultisigTransaction>,
+    pub proposer: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
-    #[derive(Accounts)]
-    pub struct RejectTransaction<'info> {
-        #[account(mut, seeds = [b"multisig", multisig.multisig_id.as_ref()], bump)]
-        pub multisig: Account<'info, MultisigWallet>,
-        #[account(mut, seeds = [b"multisig_tx", multisig.key().as_ref(), &transaction.transaction_id.to_le_bytes()], bump)]
-        pub transaction: Account<'info, MultisigTransaction>,
-        pub rejector: Signer<'info>,
-    }
+#[derive(Accounts)]
+pub struct ApproveTransaction<'info> {
+    #[account(mut, seeds = [b"multisig", multisig.multisig_id.as_ref()], bump)]
+    pub multisig: Account<'info, MultisigWallet>,
+    #[account(mut, seeds = [b"multisig_tx", multisig.key().as_ref(), &transaction.transaction_id.to_le_bytes()], bump)]
+    pub transaction: Account<'info, MultisigTransaction>,
+    pub approver: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ExecuteTransaction<'info> {
+    #[account(mut, seeds = [b"multisig", multisig.multisig_id.as_ref()], bump)]
+    pub multisig: Account<'info, MultisigWallet>,
+    #[account(mut, seeds = [b"multisig_tx", multisig.key().as_ref(), &transaction.transaction_id.to_le_bytes()], bump)]
+    pub transaction: Account<'info, MultisigTransaction>,
+    pub executor: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct RejectTransaction<'info> {
+    #[account(mut, seeds = [b"multisig", multisig.multisig_id.as_ref()], bump)]
+    pub multisig: Account<'info, MultisigWallet>,
+    #[account(mut, seeds = [b"multisig_tx", multisig.key().as_ref(), &transaction.transaction_id.to_le_bytes()], bump)]
+    pub transaction: Account<'info, MultisigTransaction>,
+    pub rejector: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeExtraAccountMetaList<'info> {
+    #[account(init, payer = payer, space = ExtraAccountMetaList::size_of(14).unwrap(), seeds = [b"extra-account-metas", mint.key().as_ref()], bump)]
+    /// CHECK: ExtraAccountMetaList PDA
+    pub extra_account_meta_list: UncheckedAccount<'info>,
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
 #[derive(Accounts)]
 pub struct InitializeMint<'info> {
@@ -805,7 +1112,7 @@ pub struct InitializeMint<'info> {
 
 #[derive(Accounts)]
 pub struct RegisterKyc<'info> {
-    #[account(init, payer = payer, space = 200, seeds = [b"identity", owner.key().as_ref()], bump)]
+    #[account(init, payer = payer, space = 200, seeds = [b"kyc", owner.key().as_ref()], bump)]
     pub identity_registry: Account<'info, IdentityRegistry>,
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -842,37 +1149,37 @@ pub struct Execute<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(mut)]
     pub destination_account: InterfaceAccount<'info, TokenAccount>,
-    pub source_owner: Signer<'info>,
-    /// CHECK: receiver owner can be external
-    pub receiver_owner: UncheckedAccount<'info>,
-
-    #[account(mut, seeds = [b"kyc", source_owner.key().as_ref()], bump)]
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    /// CHECK: This is the ExtraAccountMetaList PDA
+    #[account(seeds = [b"extra-account-metas", mint.key().as_ref()], bump)]
+    pub extra_account_meta_list: UncheckedAccount<'info>,
+    #[account(mut, seeds = [b"kyc", owner.key().as_ref()], bump)]
     pub source_kyc: Account<'info, IdentityRegistry>,
     #[account(mut, seeds = [b"kyc", receiver_owner.key().as_ref()], bump)]
     pub receiver_kyc: Account<'info, IdentityRegistry>,
-
-    // Enhanced KYC attestations
-    #[account(mut, seeds = [b"kyc_attestation", source_owner.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"kyc_attestation", owner.key().as_ref()], bump)]
     pub source_kyc_attestation: Account<'info, KycAttestation>,
     #[account(mut, seeds = [b"kyc_attestation", receiver_owner.key().as_ref()], bump)]
     pub receiver_kyc_attestation: Account<'info, KycAttestation>,
-
-    #[account(mut, seeds = [b"monitor", source_owner.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"monitor", owner.key().as_ref()], bump)]
     pub transaction_monitor: Account<'info, TransactionMonitor>,
-
-    #[account(mut, seeds = [b"counterparty", source_owner.key().as_ref(), receiver_owner.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"counterparty", owner.key().as_ref(), receiver_owner.key().as_ref()], bump)]
     pub counterparty_relationship: Account<'info, CounterpartyRelationship>,
-
-    #[account(mut, seeds = [b"attestation", source_owner.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"attestation", owner.key().as_ref()], bump)]
     pub compliance_attestation: Account<'info, ComplianceAttestation>,
-
-    #[account(mut, seeds = [b"lock", mint.key().as_ref()], bump)]
+    #[account(
+        init_if_needed,
+        payer = owner,
+        space = 8 + 1,
+        seeds = [b"lock", mint.key().as_ref()],
+        bump
+    )]
     pub lock: Account<'info, ReentrancyLock>,
-
+    /// CHECK: receiver owner
+    pub receiver_owner: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
-
-// ==================== NEW: ENHANCED KYC ACCOUNT STRUCTS ====================
 
 #[derive(Accounts)]
 pub struct IssueKycAttestation<'info> {
@@ -908,9 +1215,9 @@ pub struct CheckKycExpiry<'info> {
 }
 
 #[derive(Accounts)]
-pub struct UpdateTransactionMonitor<'info> {
+pub struct UpdateMonitor<'info> {
     #[account(init_if_needed, payer = payer, space = 150, seeds = [b"monitor", owner.key().as_ref()], bump)]
-    pub transaction_monitor: Account<'info, TransactionMonitor>,
+    pub monitor: Account<'info, TransactionMonitor>,
     pub owner: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,

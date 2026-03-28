@@ -5,6 +5,10 @@ members = [
 ]
 resolver = "2"
 
+
+[patch.crates-io]
+subtle = { git = "https://github.com/dalek-cryptography/subtle", rev = "369e746" }
+
 [profile.release]
 overflow-checks = true
 lto = "fat"

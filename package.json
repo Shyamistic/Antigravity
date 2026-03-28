@@ -1,32 +1,14 @@
 {
-  "name": "antigravity",
-  "version": "1.0.0",
-  "type": "module",
+  "name": "antigravity-institutional-suite",
+  "version": "3.0.0",
+  "description": "Antigravity Institutional Liquidity Orchestrator",
   "scripts": {
-    "start": "npx concurrently \"npm run start:gateway\" \"npm run start:bridge\" \"npm run start:dashboard\"",
+    "install:all": "npm install && cd app/compliance-gateway && npm install && cd ../dashboard && npm install",
+    "start": "npx concurrently \"npm run start:gateway\" \"npm run start:dashboard\"",
     "start:gateway": "cd app/compliance-gateway && npm start",
-    "start:bridge": "cd app/sdp-bridge && npm start",
-    "start:dashboard": "cd app/dashboard && npm run dev",
-    "start:agent": "cd llm && python agent.py",
-    "demo": "node scripts/cross-border-demo.mjs",
-    "install:all": "npm install && cd app/compliance-gateway && npm install && cd ../sdp-bridge && npm install && cd ../dashboard && npm install",
-    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
-  },
-  "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
-    "@solana/spl-token": "^0.4.14",
-    "@solana/web3.js": "^1.98.4"
+    "start:dashboard": "cd app/dashboard && npm run dev"
   },
   "devDependencies": {
-    "@types/bn.js": "^5.1.0",
-    "@types/chai": "^4.3.0",
-    "@types/mocha": "^10.0.6",
-    "chai": "^4.3.4",
-    "concurrently": "^8.2.2",
-    "mocha": "^10.4.0",
-    "prettier": "^3.2.5",
-    "ts-mocha": "^10.0.0",
-    "typescript": "^5.4.5"
+    "concurrently": "^8.2.2"
   }
 }

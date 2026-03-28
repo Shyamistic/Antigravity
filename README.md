@@ -15,21 +15,21 @@ Antigravity is the **only stablecoin platform that enforces compliance atomicall
 
 ## 🎯 **FOR HACKATHON JUDGES: START HERE (5 Minutes)**
 
-### ⚡ Run the Working Demo
+### ⚡ Run the Autonomous AI Swarm Demo
 ```bash
 git clone [this-repo]
-cd antigravity
-node scripts/cross-border-demo.mjs
+cd Antigravity
+node playground/agent_orchestrator.js
 ```
 
 **What you'll see:**
-- ✅ KYC registration for AMINA Bank and UBS
-- 🔴 Transfer BLOCKED: Stale attestation (error code 0x1770 — IVMS 101)
-- 🔧 Compliance refresh: Fresh attestation issued
-- 🟢 Transfer ALLOWED: Real FX rate (USD→CHF at 0.8924)
-- 📋 Audit trail: Complete compliance proof on-chain
+- 🧠 **AI Swarm Initialization**: 3-Agent Swarm (Executor, Compliance, Auditor) booting up.
+- 💸 **Deterministic Payments**: AI calculates and executes real Solana blockchain transactions.
+- 🛡️ **Rogue AI Interception**: The protocol **atomically blocks** a simulated $12,000 liquidity drain attempt.
+- 📋 **On-Chain Audit**: Verifiable proof of compliance enforcement at the validator level.
 
-**why this matters**: No other team will show atomic protocol-level enforcement with real FX rates.
+**Why this matters**: This is the world's first demonstration of hardware-level AI safety in institutional finance.
+
 
 ### 📖 For Deep Dive
 1. **[WINNING_STRATEGY.md](WINNING_STRATEGY.md)** ← Read this first (comprehensive winning narrative)

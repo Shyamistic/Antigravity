@@ -2,6 +2,9 @@
 seeds = true
 skip-lint = false
 
+[toolchain]
+anchor_version = "0.31.0"
+
 [programs.localnet]
 antigravity_core  = "EiCCdPf5QBvVbywubi6LdgPeC5RbL4Qef5KV4ScUj9hy"
 antigravity_yield = "AntiGrv2222222222222222222222222222222222222"
