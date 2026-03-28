@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/Screenshot (3182).png" alt="Antigravity Institutional Dashboard" width="100%"/>
+  <img src="assets/Screenshot (3185).png" alt="Antigravity Institutional Dashboard" width="100%"/>
 </p>
 
 <h1 align="center">🌌 ANTIGRAVITY</h1>
 <h3 align="center"><code>The World's First Deterministic AI-Safe Institutional Liquidity Protocol</code></h3>
 
 <p align="center">
-  <strong>StableHacks 2026 Grand Prize Submission — Track 1 (Stablecoin Infrastructure) & Track 3 (Programmable Payments)</strong>
+  <strong>StableHacks 2026 Submission — Track 1 (Stablecoin Infrastructure) & Track 3 (Programmable Payments)</strong>
 </p>
 
 <p align="center">
@@ -248,7 +248,7 @@ Antigravity is built on **real infrastructure** from StableHacks 2026 sponsors. 
 | **Superteam Germany** | Community feedback, UX iteration, hackathon mentorship | 🟢 ACTIVE | Dashboard iterations |
 
 <p align="center">
-  <img src="assets/Screenshot (3185).png" alt="Compliance Gate — FATF Matrix & AI Swarm" width="100%"/>
+  <img src="assets/Screenshot (3188).png" alt="Compliance Gate — FATF Matrix & AI Swarm" width="100%"/>
 </p>
 
 ---
@@ -270,6 +270,10 @@ The Antigravity protocol consists of **46,253 bytes** of Rust source code deploy
 | `MultisigWallet` | Multi-signature governance | `threshold`, `owners`, `permissions` |
 | `CounterpartyRelationship` | Whitelist graph | `counterparty`, `allowed` |
 | `ReentrancyLock` | Transfer hook reentrancy guard | `is_locked` |
+
+<p align="center">
+  <img src="assets/Screenshot (3182).png" alt="On-Chain Account Structures (PDAs)" width="100%"/>
+</p>
 
 ### Error Codes
 
@@ -308,7 +312,7 @@ Antigravity deploys a **3-agent AI swarm** powered by Featherless DeepSeek-Coder
 When we inject a prompt-injection into Agent Alpha directing it to drain the treasury ($12,000), the on-chain protocol **independently blocks the transaction** with error `0x1774`. The AI is fully compromised, but **it cannot hack math**.
 
 <p align="center">
-  <img src="assets/Screenshot (3186).png" alt="Liquidity Hub — Real-Time Positions" width="100%"/>
+  <img src="assets/Screenshot (3186).png" alt="Rogue AI Interception — Protocol Enforcement" width="100%"/>
 </p>
 
 ---
@@ -395,7 +399,7 @@ npm run dev
 | 23 | Capital Efficiency Analytics (NLI/LVS/YCR) | Dashboard | ✅ |
 
 <p align="center">
-  <img src="assets/Screenshot (3188).png" alt="Analytics — Capital Efficiency" width="100%"/>
+  <img src="assets/Screenshot (3189).png" alt="Analytics — Capital Efficiency & NOSTRO Liberation" width="100%"/>
 </p>
 
 ---
@@ -438,7 +442,7 @@ Status:         [CRYPTOGRAPHICALLY VERIFIED ON SOLANA]
 ```
 
 <p align="center">
-  <img src="assets/Screenshot (3190).png" alt="On-Chain Audit Receipt" width="100%"/>
+  <img src="assets/Screenshot (3184).png" alt="On-Chain Audit Log — Deterministic Execution" width="100%"/>
 </p>
 
 ---
@@ -452,7 +456,7 @@ Status:         [CRYPTOGRAPHICALLY VERIFIED ON SOLANA]
 | **Smart Contract** | [`Heh9pGUxRkkkEPkWv3xiBxcb3tqd7t4vDMf8vu9sxrxG`](https://explorer.solana.com/address/Heh9pGUxRkkkEPkWv3xiBxcb3tqd7t4vDMf8vu9sxrxG?cluster=devnet) | Solana Devnet |
 
 <p align="center">
-  <img src="assets/Screenshot (3187).png" alt="Admin Panel — Governance Controls" width="100%"/>
+  <img src="assets/Screenshot (3190).png" alt="Admin Panel — Governance Controls" width="100%"/>
 </p>
 
 ---
@@ -522,7 +526,7 @@ The result: **compliance is not a feature — it is the physics of the system**.
 This is what makes Antigravity the world's first protocol that is **mathematically safe** for autonomous AI treasury management. The AI can be fully compromised, hallucinating, or prompt-injected — but it **cannot violate the laws of the blockchain**.
 
 <p align="center">
-  <img src="assets/Screenshot (3189).png" alt="Gateway Boot — mTLS Handshake" width="100%"/>
+  <img src="assets/Screenshot (3187).png" alt="Liquidity Intelligence — The Billion-Dollar Physics" width="100%"/>
 </p>
 
 ---
@@ -544,12 +548,12 @@ This is what makes Antigravity the world's first protocol that is **mathematical
 
 **Built with 🌌 by Antigravity Technical Team**
 
-*StableHacks 2026 Grand Prize Submission*
+*StableHacks 2026 Submission*
 
 ---
 
 <p align="center">
-  <img src="assets/Screenshot (3191).png" alt="Full Compliance Test Suite — 5 Passing" width="100%"/>
+  <img src="assets/Screenshot (3191).png" alt="Full Compliance Test Suite — Terminal Proof" width="100%"/>
 </p>
 
 <p align="center">
